@@ -43,6 +43,12 @@
             <artifactId>jakarta.validation-api</artifactId>
         </dependency>
 
+        <!-- SLF4J API (日志接口) -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
         <!-- JUnit 5 (测试框架) -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

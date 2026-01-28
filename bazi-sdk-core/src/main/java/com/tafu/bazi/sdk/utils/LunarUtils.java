@@ -1,8 +1,8 @@
 package com.tafu.bazi.sdk.utils;
 
+import com.nlf.calendar.EightChar;
 import com.nlf.calendar.Lunar;
 import com.nlf.calendar.Solar;
-import com.nlf.calendar.eightchar.EightChar;
 import com.tafu.bazi.sdk.model.BaziDef;
 
 import java.util.ArrayList;
