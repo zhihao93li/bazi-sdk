@@ -41,11 +41,11 @@ git commit -m "Initial commit: Bazi SDK v1.0.0"
 
 # 2. 推送到 GitHub
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/bazi-sdk.git
+git remote add origin https://github.com/bazi-sdk/bazi-sdk.git
 git push -u origin main
 
 # 3. 创建 Release (在 GitHub 网页)
-# 访问: https://github.com/YOUR_USERNAME/bazi-sdk/releases/new
+# 访问: https://github.com/bazi-sdk/bazi-sdk/releases/new
 # - Tag: v1.0.0
 # - Title: v1.0.0 - Initial Release
 # - 点击 Publish release
