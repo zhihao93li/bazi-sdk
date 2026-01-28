@@ -1,0 +1,36 @@
+package com.tafu.bazi.sdk.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * 格局信息 DTO
+ *
+ * @author Tafu Team
+ * @since 2026-01-27
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class PatternDTO {
+  /** 格局名称 (如 "正财格") */
+  private String name;
+
+  /** 分类: "normal" | "special" */
+  private String category;
+
+  /** 格局描述 */
+  private String description;
+
+  /** 月令本气 (可选) */
+  private String monthStem;
+
+  /** 月令十神 (可选) */
+  private String monthStemTenGod;
+
+  /** 是否透出 (可选) */
+  private Boolean isTransparent;
+}
