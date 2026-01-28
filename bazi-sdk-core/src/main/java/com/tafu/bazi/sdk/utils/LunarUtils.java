@@ -2,6 +2,7 @@ package com.tafu.bazi.sdk.utils;
 
 import com.nlf.calendar.EightChar;
 import com.nlf.calendar.Lunar;
+import com.nlf.calendar.LunarYear;
 import com.nlf.calendar.Solar;
 import com.tafu.bazi.sdk.model.BaziDef;
 
@@ -128,9 +129,9 @@ public class LunarUtils {
      */
     public static int getLeapMonth(int lunarYear) {
         try {
-            // 使用农历正月初一来获取该年的闰月信息
-            Lunar lunar = Lunar.fromYmd(lunarYear, 1, 1);
-            return lunar.getLeapMonth();
+            // 使用 LunarYear 获取指定年份的闰月信息
+            LunarYear ly = LunarYear.fromYear(lunarYear);
+            return ly.getLeapMonth();
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid lunar year: " + lunarYear, e);
         }
