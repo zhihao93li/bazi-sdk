@@ -39,7 +39,7 @@
         <module>bazi-sdk-spring-boot-starter</module>
     </modules>
 
-    <distributionManagement>
+<distributionManagement>
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>

@@ -563,37 +563,52 @@ public class BaziCalculatorImpl implements BaziCalculator {
         
         int birthYear = lunar.getYear();
         
+        // lunar-java 支持的年份范围
+        final int MIN_YEAR = 1901;
+        final int MAX_YEAR = 2100;
+        
         for (int i = 0; i < Math.min(10, daYunArray.length); i++) {
             DaYun daYun = daYunArray[i];
-            int daYunStartAge = startAge + i * 10;
-            int daYunEndAge = daYunStartAge + 9;
-            int daYunStartYear = birthYear + daYunStartAge;
-            int daYunEndYear = birthYear + daYunEndAge;
+            int daYunStartAge = daYun.getStartAge();
+            int daYunEndAge = daYun.getEndAge();
+            int daYunStartYear = daYun.getStartYear();
+            int daYunEndYear = daYun.getEndYear();
             
+            // 从 getGanZhi() 中提取干支
             String ganZhi = daYun.getGanZhi();
-            String gan = LunarUtils.extractGan(ganZhi);
-            String zhi = LunarUtils.extractZhi(ganZhi);
+            String gan = ganZhi != null && ganZhi.length() >= 1 ? ganZhi.substring(0, 1) : "";
+            String zhi = ganZhi != null && ganZhi.length() >= 2 ? ganZhi.substring(1, 2) : "";
             
-            // 计算流年
+            // 计算流年: 为该大运内的每一年生成流年数据
             List<LiuNianDTO> liuNianList = new ArrayList<>();
-            LiuNian[] liuNianArray = daYun.getLiuNian();
             
-            for (int j = 0; j < Math.min(10, liuNianArray.length); j++) {
-                LiuNian liuNian = liuNianArray[j];
-                int age = daYunStartAge + j;
-                int year = daYunStartYear + j;
+            for (int year = daYunStartYear; year <= daYunEndYear; year++) {
+                // 跳过超出支持范围的年份
+                if (year < MIN_YEAR || year > MAX_YEAR) {
+                    continue;
+                }
                 
-                String lnGanZhi = liuNian.getGanZhi();
-                String lnGan = LunarUtils.extractGan(lnGanZhi);
-                String lnZhi = LunarUtils.extractZhi(lnGanZhi);
+                int age = daYunStartAge + (year - daYunStartYear);
                 
-                liuNianList.add(LiuNianDTO.builder()
-                    .year(year)
-                    .age(age)
-                    .ganZhi(lnGanZhi)
-                    .gan(lnGan)
-                    .zhi(lnZhi)
-                    .build());
+                // 使用 lunar-java 计算流年干支
+                // 使用7月1日(年中)来确保一定过了立春,获取该年正确的干支
+                try {
+                    Solar yearSolar = Solar.fromYmd(year, 7, 1);
+                    Lunar yearLunar = yearSolar.getLunar();
+                    String yearGanZhi = yearLunar.getYearInGanZhiExact(); // 精确年干支
+                    String yearGan = yearGanZhi != null && yearGanZhi.length() >= 1 ? yearGanZhi.substring(0, 1) : "";
+                    String yearZhi = yearGanZhi != null && yearGanZhi.length() >= 2 ? yearGanZhi.substring(1, 2) : "";
+                    
+                    liuNianList.add(LiuNianDTO.builder()
+                        .year(year)
+                        .age(age)
+                        .ganZhi(yearGanZhi)
+                        .gan(yearGan)
+                        .zhi(yearZhi)
+                        .build());
+                } catch (Exception e) {
+                    log.warn("计算流年失败 year={}: {}", year, e.getMessage());
+                }
             }
             
             daYunList.add(DaYunDTO.builder()
