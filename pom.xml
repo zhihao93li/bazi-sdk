@@ -29,9 +29,9 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/YOUR_GITHUB_USERNAME/bazi-sdk.git</connection>
-        <developerConnection>scm:git:ssh://github.com:YOUR_GITHUB_USERNAME/bazi-sdk.git</developerConnection>
-        <url>https://github.com/YOUR_GITHUB_USERNAME/bazi-sdk/tree/main</url>
+        <connection>scm:git:git://github.com/zhihao93li/bazi-sdk.git</connection>
+        <developerConnection>scm:git:ssh://github.com:zhihao93li/bazi-sdk.git</developerConnection>
+        <url>https://github.com/zhihao93li/bazi-sdk/tree/main</url>
     </scm>
 
     <modules>
@@ -43,7 +43,7 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/YOUR_GITHUB_USERNAME/bazi-sdk</url>
+            <url>https://maven.pkg.github.com/zhihao93li/bazi-sdk</url>
         </repository>
     </distributionManagement>
 
