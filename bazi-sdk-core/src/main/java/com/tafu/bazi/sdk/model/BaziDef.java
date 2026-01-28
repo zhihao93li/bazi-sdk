@@ -1,5 +1,9 @@
 package com.tafu.bazi.sdk.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.Getter;
+
 import java.util.*;
 
 /**
@@ -10,6 +14,55 @@ import java.util.*;
  * @version 1.0.0
  */
 public class BaziDef {
+
+    // ========== 枚举定义 ==========
+    
+    /**
+     * 五行枚举
+     */
+    @Getter
+    @AllArgsConstructor
+    public enum FiveElement {
+        METAL("metal", "金"),
+        WOOD("wood", "木"),
+        WATER("water", "水"),
+        FIRE("fire", "火"),
+        EARTH("earth", "土");
+
+        private final String code;
+        private final String chinese;
+
+        public static FiveElement fromCode(String code) {
+            return Arrays.stream(values())
+                .filter(e -> e.code.equals(code))
+                .findFirst()
+                .orElse(null);
+        }
+    }
+
+    /**
+     * 阴阳枚举
+     */
+    @Getter
+    @AllArgsConstructor
+    public enum YinYang {
+        YIN("yin", "阴"),
+        YANG("yang", "阳");
+
+        private final String code;
+        private final String chinese;
+    }
+
+    /**
+     * 天干信息类
+     */
+    @Data
+    @AllArgsConstructor
+    public static class StemInfo {
+        private String chinese;
+        private FiveElement element;
+        private YinYang yinYang;
+    }
 
     // ========== 天干地支基础信息 ==========
     
@@ -23,7 +76,24 @@ public class BaziDef {
         "子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"
     };
     
-    /** 天干五行映射 */
+    /** 天干信息映射 */
+    public static final Map<String, StemInfo> STEMS_INFO = new HashMap<>();
+    
+    static {
+        STEMS_INFO.put("甲", new StemInfo("甲", FiveElement.WOOD, YinYang.YANG));
+        STEMS_INFO.put("乙", new StemInfo("乙", FiveElement.WOOD, YinYang.YIN));
+        STEMS_INFO.put("丙", new StemInfo("丙", FiveElement.FIRE, YinYang.YANG));
+        STEMS_INFO.put("丁", new StemInfo("丁", FiveElement.FIRE, YinYang.YIN));
+        STEMS_INFO.put("戊", new StemInfo("戊", FiveElement.EARTH, YinYang.YANG));
+        STEMS_INFO.put("己", new StemInfo("己", FiveElement.EARTH, YinYang.YIN));
+        STEMS_INFO.put("庚", new StemInfo("庚", FiveElement.METAL, YinYang.YANG));
+        STEMS_INFO.put("辛", new StemInfo("辛", FiveElement.METAL, YinYang.YIN));
+        STEMS_INFO.put("壬", new StemInfo("壬", FiveElement.WATER, YinYang.YANG));
+        STEMS_INFO.put("癸", new StemInfo("癸", FiveElement.WATER, YinYang.YIN));
+    }
+    
+    /** 天干五行映射 (保留向后兼容) */
+    @Deprecated
     public static final Map<String, String> TIAN_GAN_ELEMENT = new HashMap<>() {{
         put("甲", "wood"); put("乙", "wood");
         put("丙", "fire"); put("丁", "fire");
@@ -32,7 +102,8 @@ public class BaziDef {
         put("壬", "water"); put("癸", "water");
     }};
     
-    /** 天干阴阳映射 */
+    /** 天干阴阳映射 (保留向后兼容) */
+    @Deprecated
     public static final Map<String, String> TIAN_GAN_YIN_YANG = new HashMap<>() {{
         put("甲", "yang"); put("乙", "yin");
         put("丙", "yang"); put("丁", "yin");
@@ -50,6 +121,24 @@ public class BaziDef {
         put("申", "metal"); put("酉", "metal");
         put("戌", "earth"); put("亥", "water");
     }};
+    
+    /** 月支五行映射 (用于得令判断) */
+    public static final Map<String, FiveElement> MONTH_BRANCH_ELEMENT = new HashMap<>();
+    
+    static {
+        MONTH_BRANCH_ELEMENT.put("寅", FiveElement.WOOD);
+        MONTH_BRANCH_ELEMENT.put("卯", FiveElement.WOOD);
+        MONTH_BRANCH_ELEMENT.put("辰", FiveElement.EARTH);
+        MONTH_BRANCH_ELEMENT.put("巳", FiveElement.FIRE);
+        MONTH_BRANCH_ELEMENT.put("午", FiveElement.FIRE);
+        MONTH_BRANCH_ELEMENT.put("未", FiveElement.EARTH);
+        MONTH_BRANCH_ELEMENT.put("申", FiveElement.METAL);
+        MONTH_BRANCH_ELEMENT.put("酉", FiveElement.METAL);
+        MONTH_BRANCH_ELEMENT.put("戌", FiveElement.EARTH);
+        MONTH_BRANCH_ELEMENT.put("亥", FiveElement.WATER);
+        MONTH_BRANCH_ELEMENT.put("子", FiveElement.WATER);
+        MONTH_BRANCH_ELEMENT.put("丑", FiveElement.EARTH);
+    }
     
     /** 地支阴阳映射 */
     public static final Map<String, String> DI_ZHI_YIN_YANG = new HashMap<>() {{
@@ -79,7 +168,26 @@ public class BaziDef {
         put("亥", List.of("壬", "甲"));
     }};
     
-    /** 地支藏干权重映射 (用于日主强弱计算) */
+    /** 藏干权重 (本气/中气/余气的相对权重比例) */
+    public static final Map<String, List<Double>> HIDDEN_STEM_WEIGHTS = new HashMap<>();
+    
+    static {
+        HIDDEN_STEM_WEIGHTS.put("子", List.of(1.0));
+        HIDDEN_STEM_WEIGHTS.put("丑", List.of(0.6, 0.2, 0.2));
+        HIDDEN_STEM_WEIGHTS.put("寅", List.of(0.6, 0.2, 0.2));
+        HIDDEN_STEM_WEIGHTS.put("卯", List.of(1.0));
+        HIDDEN_STEM_WEIGHTS.put("辰", List.of(0.6, 0.2, 0.2));
+        HIDDEN_STEM_WEIGHTS.put("巳", List.of(0.6, 0.2, 0.2));
+        HIDDEN_STEM_WEIGHTS.put("午", List.of(0.7, 0.3));
+        HIDDEN_STEM_WEIGHTS.put("未", List.of(0.6, 0.2, 0.2));
+        HIDDEN_STEM_WEIGHTS.put("申", List.of(0.6, 0.2, 0.2));
+        HIDDEN_STEM_WEIGHTS.put("酉", List.of(1.0));
+        HIDDEN_STEM_WEIGHTS.put("戌", List.of(0.6, 0.2, 0.2));
+        HIDDEN_STEM_WEIGHTS.put("亥", List.of(0.7, 0.3));
+    }
+    
+    /** @deprecated 使用 HIDDEN_STEM_WEIGHTS 代替 */
+    @Deprecated
     public static final Map<String, Map<String, Double>> DI_ZHI_HIDDEN_STEMS_WEIGHT = new HashMap<>() {{
         put("子", Map.of("癸", 10.0));
         put("丑", Map.of("己", 6.0, "癸", 2.0, "辛", 2.0));
@@ -98,9 +206,11 @@ public class BaziDef {
     // ========== 十神关系映射 ==========
     
     /** 
-     * 十神关系映射表
+     * 十神关系映射表 (保留向后兼容,推荐使用动态计算)
      * 格式: Map<日主天干, Map<其他天干, 十神名称>>
+     * @deprecated 推荐使用动态计算方式(基于五行和阴阳判断)
      */
+    @Deprecated
     public static final Map<String, Map<String, String>> TEN_GODS_MAP = new HashMap<>() {{
         put("甲", Map.of(
             "甲", "比肩", "乙", "劫财", "丙", "食神", "丁", "伤官", "戊", "偏财",
@@ -143,10 +253,42 @@ public class BaziDef {
             "己", "七杀", "庚", "正印", "辛", "偏印", "壬", "劫财", "癸", "比肩"
         ));
     }};
+    
+    /** 十神名称列表 */
+    public static final List<String> TEN_GODS = 
+        List.of("比肩", "劫财", "食神", "伤官", "偏财", "正财", "七杀", "正官", "偏印", "正印");
 
     // ========== 五行关系映射 ==========
     
-    /** 五行相生关系 */
+    /** 五行相生关系 (枚举版本) */
+    public static final Map<FiveElement, FiveElement> FIVE_ELEMENTS_GENERATION = Map.of(
+        FiveElement.WOOD, FiveElement.FIRE,    // 木生火
+        FiveElement.FIRE, FiveElement.EARTH,   // 火生土
+        FiveElement.EARTH, FiveElement.METAL,  // 土生金
+        FiveElement.METAL, FiveElement.WATER,  // 金生水
+        FiveElement.WATER, FiveElement.WOOD    // 水生木
+    );
+    
+    /** 五行相克关系 (枚举版本) */
+    public static final Map<FiveElement, FiveElement> FIVE_ELEMENTS_RESTRICTION = Map.of(
+        FiveElement.WOOD, FiveElement.EARTH,   // 木克土
+        FiveElement.EARTH, FiveElement.WATER,  // 土克水
+        FiveElement.WATER, FiveElement.FIRE,   // 水克火
+        FiveElement.FIRE, FiveElement.METAL,   // 火克金
+        FiveElement.METAL, FiveElement.WOOD    // 金克木
+    );
+    
+    /** 五行被生关系 (反向映射) */
+    public static final Map<FiveElement, FiveElement> FIVE_ELEMENTS_GENERATED_BY = Map.of(
+        FiveElement.WOOD, FiveElement.WATER,   // 水生木
+        FiveElement.FIRE, FiveElement.WOOD,    // 木生火
+        FiveElement.EARTH, FiveElement.FIRE,   // 火生土
+        FiveElement.METAL, FiveElement.EARTH,  // 土生金
+        FiveElement.WATER, FiveElement.METAL   // 金生水
+    );
+    
+    /** 五行相生关系 (保留向后兼容) */
+    @Deprecated
     public static final Map<String, String> ELEMENT_GENERATE = Map.of(
         "wood", "fire",   // 木生火
         "fire", "earth",  // 火生土
@@ -155,7 +297,8 @@ public class BaziDef {
         "water", "wood"   // 水生木
     );
     
-    /** 五行相克关系 */
+    /** 五行相克关系 (保留向后兼容) */
+    @Deprecated
     public static final Map<String, String> ELEMENT_CONQUER = Map.of(
         "wood", "earth",  // 木克土
         "fire", "metal",  // 火克金
@@ -173,12 +316,25 @@ public class BaziDef {
         "water", "水"
     );
 
-    // ========== 五行状态权重映射 (用于日主强弱计算) ==========
+    // ========== 五行状态权重映射 ==========
     
     /**
-     * 五行在不同月令下的状态权重
-     * 旺(40) > 相(30) > 休(10) > 囚(0) > 死(-10)
+     * 五行状态权重 (旺相休囚死)
+     * 用于五行分布计算中的状态调整
      */
+    public static final Map<String, Double> STATE_WEIGHTS = Map.of(
+        "wang", 1.5,   // 旺
+        "xiang", 1.2,  // 相
+        "xiu", 1.0,    // 休
+        "qiu", 0.7,    // 囚
+        "si", 0.5      // 死
+    );
+    
+    /**
+     * 五行在不同月令下的状态权重 (保留向后兼容)
+     * @deprecated 使用 STATE_WEIGHTS 和动态计算代替
+     */
+    @Deprecated
     public static final Map<String, Map<String, Integer>> ELEMENT_STATES_WEIGHT = new HashMap<>() {{
         // 寅卯月 (木旺)
         put("寅", Map.of("wood", 40, "fire", 30, "water", 10, "metal", 0, "earth", -10));

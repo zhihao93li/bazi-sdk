@@ -45,7 +45,7 @@ public class LunarUtils {
 
     /**
      * 计算真太阳时
-     * 根据经度修正北京时间 (东经120度为基准)
+     * 根据经度修正北京时间 (东经120度为基准) + 均时差修正
      * 
      * @param year 年
      * @param month 月
@@ -56,16 +56,49 @@ public class LunarUtils {
      * @return 修正后的 Solar 对象
      */
     public static Solar getTrueSolarTime(int year, int month, int day, int hour, int minute, double longitude) {
-        // 计算时差: (经度 - 120) * 4 分钟
-        double timeDiff = (longitude - 120.0) * 4.0;
-        
         // 创建 Calendar 进行时间计算
         Calendar cal = Calendar.getInstance();
-        cal.set(year, month - 1, day, hour, minute, 0);
-        cal.set(Calendar.MILLISECOND, 0);
+        cal.set(year, month - 1, day);
+        int dayOfYear = cal.get(Calendar.DAY_OF_YEAR);
         
-        // 加上时差
-        cal.add(Calendar.MINUTE, (int) Math.round(timeDiff));
+        // 计算均时差 (Equation of Time, EOT)
+        // B 为角度参数
+        double B = (2 * Math.PI * (dayOfYear - 81)) / 365.0;
+        // 均时差公式 (单位:分钟)
+        double eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
+        
+        // 计算总时差: 经度修正 + 均时差
+        double longitudeCorrection = (longitude - 120.0) * 4.0;  // 经度修正
+        double totalMinutes = hour * 60 + minute + longitudeCorrection + eot;
+        
+        // 处理跨天情况
+        int dayOffset = 0;
+        if (totalMinutes < 0) {
+            totalMinutes += 24 * 60;
+            dayOffset = -1;
+        } else if (totalMinutes >= 24 * 60) {
+            totalMinutes -= 24 * 60;
+            dayOffset = 1;
+        }
+        
+        // 计算修正后的时分
+        int newHour = (int) (totalMinutes / 60);
+        int newMinute = (int) Math.round(totalMinutes % 60);
+        
+        // 处理分钟越界
+        if (newMinute >= 60) {
+            newMinute -= 60;
+            newHour += 1;
+        }
+        if (newMinute < 0) {
+            newMinute += 60;
+            newHour -= 1;
+        }
+        
+        // 设置日期和时间
+        cal.set(year, month - 1, day, newHour, newMinute, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        cal.add(Calendar.DAY_OF_MONTH, dayOffset);
         
         // 返回修正后的 Solar 对象
         return Solar.fromYmdHms(
@@ -149,17 +182,25 @@ public class LunarUtils {
     }
 
     /**
-     * 获取地支藏干的权重
+     * 获取地支藏干的权重 (按索引返回相对权重)
      * 
      * @param zhi 地支
      * @param gan 天干
-     * @return 权重值
+     * @return 相对权重值 (0.0-1.0之间)
      */
     public static double getHiddenStemWeight(String zhi, String gan) {
-        var weightMap = BaziDef.DI_ZHI_HIDDEN_STEMS_WEIGHT.get(zhi);
-        if (weightMap != null && weightMap.containsKey(gan)) {
-            return weightMap.get(gan);
+        List<String> hiddenStems = getHiddenStems(zhi);
+        List<Double> weights = BaziDef.HIDDEN_STEM_WEIGHTS.get(zhi);
+        
+        if (hiddenStems == null || weights == null) {
+            return 0.0;
         }
+        
+        int index = hiddenStems.indexOf(gan);
+        if (index >= 0 && index < weights.size()) {
+            return weights.get(index);
+        }
+        
         return 0.0;
     }
 

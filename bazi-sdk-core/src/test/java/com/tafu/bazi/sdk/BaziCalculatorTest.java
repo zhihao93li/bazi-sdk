@@ -274,7 +274,16 @@ class BaziCalculatorTest {
         assertNotNull(response.getDayMaster().getAnalysis().getTianGanHelpDesc());
         
         double totalScore = response.getDayMaster().getAnalysis().getTotalScore();
-        assertTrue(totalScore >= -50 && totalScore <= 100); // 合理范围
+        assertTrue(totalScore >= -50 && totalScore <= 150); // 合理范围 (调整为适配新公式)
+        
+        // 验证强弱阈值: ≥50(strong), ≤25(weak), else(balanced)
+        if (totalScore >= 50) {
+            assertEquals("strong", response.getDayMaster().getStrength());
+        } else if (totalScore <= 25) {
+            assertEquals("weak", response.getDayMaster().getStrength());
+        } else {
+            assertEquals("balanced", response.getDayMaster().getStrength());
+        }
     }
 
     @Test
@@ -335,5 +344,141 @@ class BaziCalculatorTest {
         assertTrue(firstDaYun.getEndAge() > firstDaYun.getStartAge());
         assertNotNull(firstDaYun.getLiuNian());
         assertFalse(firstDaYun.getLiuNian().isEmpty());
+    }
+    
+    @Test
+    void testFiveElementsStateSystem() {
+        // 测试五行旺相休囚死系统
+        BaziRequest request = BaziRequest.builder()
+            .year(1990)
+            .month(6)  // 夏季
+            .day(15)
+            .hour(14)
+            .minute(30)
+            .calendarType("solar")
+            .gender("male")
+            .build();
+
+        BaziResponse response = calculator.calculate(request);
+
+        // 验证五行状态存在
+        assertNotNull(response.getFiveElements().getElementStates());
+        assertFalse(response.getFiveElements().getElementStates().isEmpty());
+        
+        // 验证五行状态包含旺相休囚死
+        var states = response.getFiveElements().getElementStates();
+        assertTrue(states.values().stream().anyMatch(s -> s.equals("wang")));
+        
+        System.out.println("月令五行: " + response.getFiveElements().getMonthElement());
+        System.out.println("五行状态: " + response.getFiveElements().getElementStates());
+    }
+    
+    @Test
+    void testPatternJudgment_JianLu() {
+        // 测试建禄格: 甲日主生于寅月
+        BaziRequest request = BaziRequest.builder()
+            .year(1984)
+            .month(2)  // 寅月
+            .day(5)
+            .hour(8)
+            .minute(0)
+            .calendarType("solar")
+            .gender("male")
+            .build();
+
+        BaziResponse response = calculator.calculate(request);
+        
+        System.out.println("日主: " + response.getDayMaster().getGan());
+        System.out.println("月支: " + response.getFourPillars().getMonth().getEarthlyBranch().getChinese());
+        System.out.println("格局: " + response.getPattern().getName());
+        
+        // 验证格局信息
+        assertNotNull(response.getPattern().getName());
+        assertNotNull(response.getPattern().getCategory());
+        assertNotNull(response.getPattern().getDescription());
+    }
+    
+    @Test
+    void testPatternJudgment_YangRen() {
+        // 测试羊刃格: 甲日主生于卯月
+        BaziRequest request = BaziRequest.builder()
+            .year(1984)
+            .month(3)  // 卯月
+            .day(5)
+            .hour(8)
+            .minute(0)
+            .calendarType("solar")
+            .gender("male")
+            .build();
+
+        BaziResponse response = calculator.calculate(request);
+        
+        System.out.println("日主: " + response.getDayMaster().getGan());
+        System.out.println("月支: " + response.getFourPillars().getMonth().getEarthlyBranch().getChinese());
+        System.out.println("格局: " + response.getPattern().getName());
+        
+        assertNotNull(response.getPattern().getName());
+        assertNotNull(response.getPattern().getCategory());
+    }
+    
+    @Test
+    void testPatternJudgment_NormalPattern() {
+        // 测试正格
+        BaziRequest request = BaziRequest.builder()
+            .year(1990)
+            .month(6)
+            .day(15)
+            .hour(14)
+            .minute(30)
+            .calendarType("solar")
+            .gender("male")
+            .build();
+
+        BaziResponse response = calculator.calculate(request);
+        
+        System.out.println("格局: " + response.getPattern().getName());
+        System.out.println("分类: " + response.getPattern().getCategory());
+        System.out.println("描述: " + response.getPattern().getDescription());
+        
+        // 验证格局分类
+        assertTrue(
+            response.getPattern().getCategory().equals("normal") ||
+            response.getPattern().getCategory().equals("special")
+        );
+        
+        // 验证月令本气
+        if (response.getPattern().getMonthStem() != null) {
+            assertNotNull(response.getPattern().getMonthStemTenGod());
+        }
+    }
+    
+    @Test
+    void testDayMasterStrengthThresholds() {
+        // 测试日主强弱阈值: ≥50(strong), ≤25(weak), else(balanced)
+        
+        // 这个测试需要找到一个确定的弱格八字
+        BaziRequest weakRequest = BaziRequest.builder()
+            .year(1990)
+            .month(1)
+            .day(1)
+            .hour(0)
+            .minute(0)
+            .calendarType("solar")
+            .gender("male")
+            .build();
+        
+        BaziResponse weakResponse = calculator.calculate(weakRequest);
+        double weakScore = weakResponse.getDayMaster().getAnalysis().getTotalScore();
+        
+        System.out.println("测试用例 - 总分: " + weakScore + ", 强弱: " + weakResponse.getDayMaster().getStrength());
+        
+        // 验证阈值逻辑
+        if (weakScore >= 50) {
+            assertEquals("strong", weakResponse.getDayMaster().getStrength());
+        } else if (weakScore <= 25) {
+            assertEquals("weak", weakResponse.getDayMaster().getStrength());
+        } else {
+            assertEquals("balanced", weakResponse.getDayMaster().getStrength());
+        }
     }
 }

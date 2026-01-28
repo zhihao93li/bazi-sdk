@@ -273,9 +273,37 @@ public class BaziCalculatorImpl implements BaziCalculator {
      * @param targetGan 目标天干
      * @return 十神名称
      */
+    /**
+     * 获取十神 (旧版本 - 使用静态表查询)
+     * @deprecated 建议使用基于StemInfo的动态计算版本
+     */
+    @Deprecated
     private String getTenGod(String dayMasterGan, String targetGan) {
         Map<String, String> tenGodMap = BaziDef.TEN_GODS_MAP.get(dayMasterGan);
         return tenGodMap != null ? tenGodMap.get(targetGan) : null;
+    }
+    
+    /**
+     * 获取十神 (新版本 - 动态计算)
+     * 基于五行和阴阳关系动态计算十神
+     */
+    private String getTenGod(BaziDef.StemInfo dayStem, BaziDef.StemInfo otherStem) {
+        if (dayStem.getChinese().equals(otherStem.getChinese())) return "比肩";
+        
+        BaziDef.FiveElement dayEl = dayStem.getElement();
+        BaziDef.YinYang dayYY = dayStem.getYinYang();
+        BaziDef.FiveElement otherEl = otherStem.getElement();
+        BaziDef.YinYang otherYY = otherStem.getYinYang();
+        
+        boolean sameYinYang = dayYY == otherYY;
+        
+        if (dayEl == otherEl) return sameYinYang ? "比肩" : "劫财";
+        if (generatesElement(dayEl, otherEl)) return sameYinYang ? "食神" : "伤官";
+        if (restrictsElement(dayEl, otherEl)) return sameYinYang ? "偏财" : "正财";
+        if (restrictsElement(otherEl, dayEl)) return sameYinYang ? "七杀" : "正官";
+        if (generatesElement(otherEl, dayEl)) return sameYinYang ? "偏印" : "正印";
+        
+        return null;
     }
 
     /**
@@ -325,10 +353,10 @@ public class BaziCalculatorImpl implements BaziCalculator {
                 double weight = LunarUtils.getHiddenStemWeight(zhi, stem.getChinese());
                 
                 if (dayElement.equals(stem.getElement())) {
-                    deDi += weight * 1.5;
+                    deDi += weight * 15;  // 修改: 从1.5改为15
                     roots.add(pillarNames[i] + "藏" + stem.getChinese());
                 } else if (stem.getElement().equals(BaziDef.ELEMENT_GENERATE.get(dayElement))) {
-                    deDi += weight * 1.0;
+                    deDi += weight * 10;  // 修改: 从1.0改为10
                     roots.add(pillarNames[i] + "藏" + stem.getChinese() + "(印)");
                 }
             }
@@ -368,14 +396,14 @@ public class BaziCalculatorImpl implements BaziCalculator {
         // 4. 计算总分
         double totalScore = deLing + deDi + tianGanHelp;
         
-        // 5. 判断强弱
+        // 5. 判断强弱 (修改阈值: 从60/40改为50/25)
         String strength;
-        if (totalScore >= 60) {
+        if (totalScore >= 50) {
             strength = "strong";
-        } else if (totalScore >= 40) {
-            strength = "balanced";
-        } else {
+        } else if (totalScore <= 25) {
             strength = "weak";
+        } else {
+            strength = "balanced";
         }
         
         // 6. 构建分析对象
@@ -409,23 +437,47 @@ public class BaziCalculatorImpl implements BaziCalculator {
             counts.put(element, 0);
         }
         
-        // 统计天干
+        // 获取月令五行和五行状态
+        String monthZhi = fourPillars.getMonth().getEarthlyBranch().getChinese();
+        BaziDef.FiveElement monthElement = BaziDef.MONTH_BRANCH_ELEMENT.get(monthZhi);
+        Map<String, String> elementStates = getElementStates(monthElement);
+        
+        // 统计天干 (权重 1.0 * stateWeight)
         PillarDTO[] pillars = {fourPillars.getYear(), fourPillars.getMonth(), 
                                fourPillars.getDay(), fourPillars.getHour()};
         for (PillarDTO pillar : pillars) {
-            String ganElement = pillar.getHeavenlyStem().getElement();
-            distribution.put(ganElement, distribution.get(ganElement) + 1.0);
-            counts.put(ganElement, counts.get(ganElement) + 1);
-            
-            // 统计地支 (0.8权重)
-            String zhiElement = pillar.getEarthlyBranch().getElement();
-            distribution.put(zhiElement, distribution.get(zhiElement) + 0.8);
-            
-            // 统计藏干 (根据权重)
+            String gan = pillar.getHeavenlyStem().getChinese();
+            BaziDef.StemInfo info = BaziDef.STEMS_INFO.get(gan);
+            if (info != null) {
+                BaziDef.FiveElement e = info.getElement();
+                String state = elementStates.getOrDefault(e.getCode(), "si");
+                double stateWeight = BaziDef.STATE_WEIGHTS.getOrDefault(state, 0.5);
+                distribution.merge(e.getCode(), 1.0 * stateWeight, Double::sum);
+                counts.merge(e.getCode(), 1, Integer::sum);
+            }
+        }
+        
+        // 统计藏干 (权重 weight * stateWeight)
+        for (PillarDTO pillar : pillars) {
             String zhi = pillar.getEarthlyBranch().getChinese();
-            for (HiddenStemDTO stem : pillar.getHiddenStems()) {
-                double weight = LunarUtils.getHiddenStemWeight(zhi, stem.getChinese());
-                distribution.put(stem.getElement(), distribution.get(stem.getElement()) + weight / 10.0);
+            List<HiddenStemDTO> hiddenStems = pillar.getHiddenStems();
+            List<Double> weights = BaziDef.HIDDEN_STEM_WEIGHTS.getOrDefault(zhi, Collections.emptyList());
+            
+            for (int i = 0; i < hiddenStems.size(); i++) {
+                HiddenStemDTO stem = hiddenStems.get(i);
+                BaziDef.StemInfo info = BaziDef.STEMS_INFO.get(stem.getChinese());
+                if (info == null) continue;
+                
+                double weight = (i < weights.size()) ? weights.get(i) : 0.2;
+                String state = elementStates.getOrDefault(info.getElement().getCode(), "si");
+                double stateWeight = BaziDef.STATE_WEIGHTS.getOrDefault(state, 0.5);
+                
+                distribution.merge(info.getElement().getCode(), weight * stateWeight, Double::sum);
+                
+                // 只统计本气 (第一个)
+                if (i == 0) {
+                    counts.merge(info.getElement().getCode(), 1, Integer::sum);
+                }
             }
         }
         
@@ -445,31 +497,31 @@ public class BaziCalculatorImpl implements BaziCalculator {
         List<String> favorable = new ArrayList<>();
         List<String> unfavorable = new ArrayList<>();
         
-        String dayElement = BaziDef.TIAN_GAN_ELEMENT.get(dayMaster.getGan());
+        BaziDef.StemInfo dayInfo = BaziDef.STEMS_INFO.get(dayMaster.getGan());
+        String dayElement = dayInfo.getElement().getCode();
         if ("weak".equals(dayMaster.getStrength())) {
             // 日主弱,喜生扶
             favorable.add(dayElement); // 比劫
-            favorable.add(BaziDef.ELEMENT_GENERATE.get(dayElement)); // 印星
-            unfavorable.add(BaziDef.ELEMENT_CONQUER.get(dayElement)); // 官杀
+            BaziDef.FiveElement generatedBy = BaziDef.FIVE_ELEMENTS_GENERATED_BY.get(dayInfo.getElement());
+            if (generatedBy != null) {
+                favorable.add(generatedBy.getCode()); // 印星
+            }
+            BaziDef.FiveElement restricted = BaziDef.FIVE_ELEMENTS_RESTRICTION.get(dayInfo.getElement());
+            if (restricted != null) {
+                unfavorable.add(restricted.getCode()); // 财星
+            }
         } else if ("strong".equals(dayMaster.getStrength())) {
             // 日主强,喜克泄
             unfavorable.add(dayElement); // 比劫
-            unfavorable.add(BaziDef.ELEMENT_GENERATE.get(dayElement)); // 印星
-            favorable.add(BaziDef.ELEMENT_CONQUER.get(dayElement)); // 官杀
-        }
-        
-        // 计算五行状态
-        String monthZhi = fourPillars.getMonth().getEarthlyBranch().getChinese();
-        Map<String, Integer> stateWeights = BaziDef.ELEMENT_STATES_WEIGHT.get(monthZhi);
-        Map<String, String> elementStates = new HashMap<>();
-        if (stateWeights != null) {
-            for (Map.Entry<String, Integer> entry : stateWeights.entrySet()) {
-                String state = BaziDef.ELEMENT_STATE_DESC.get(entry.getValue());
-                elementStates.put(entry.getKey(), state);
+            BaziDef.FiveElement generatedBy = BaziDef.FIVE_ELEMENTS_GENERATED_BY.get(dayInfo.getElement());
+            if (generatedBy != null) {
+                unfavorable.add(generatedBy.getCode()); // 印星
+            }
+            BaziDef.FiveElement restricted = BaziDef.FIVE_ELEMENTS_RESTRICTION.get(dayInfo.getElement());
+            if (restricted != null) {
+                favorable.add(restricted.getCode()); // 财星
             }
         }
-        
-        String monthElement = BaziDef.DI_ZHI_ELEMENT.get(monthZhi);
         
         return FiveElementsDTO.builder()
             .distribution(distribution)
@@ -479,8 +531,42 @@ public class BaziCalculatorImpl implements BaziCalculator {
             .favorable(favorable)
             .unfavorable(unfavorable)
             .elementStates(elementStates)
-            .monthElement(monthElement)
+            .monthElement(monthElement != null ? monthElement.getCode() : null)
             .build();
+    }
+    
+    /**
+     * 计算五行状态 (旺相休囚死)
+     */
+    private Map<String, String> getElementStates(BaziDef.FiveElement monthElement) {
+        Map<String, String> states = new HashMap<>();
+        
+        if (monthElement == null) return states;
+        
+        // Wang: 月令本气
+        states.put(monthElement.getCode(), "wang");
+        
+        // Xiang: 月令生的
+        BaziDef.FiveElement generated = BaziDef.FIVE_ELEMENTS_GENERATION.get(monthElement);
+        if (generated != null) states.put(generated.getCode(), "xiang");
+        
+        // Xiu: 生月令的
+        BaziDef.FiveElement generator = BaziDef.FIVE_ELEMENTS_GENERATED_BY.get(monthElement);
+        if (generator != null) states.put(generator.getCode(), "xiu");
+        
+        // Qiu: 克月令的
+        for (Map.Entry<BaziDef.FiveElement, BaziDef.FiveElement> entry : BaziDef.FIVE_ELEMENTS_RESTRICTION.entrySet()) {
+            if (entry.getValue() == monthElement) {
+                states.put(entry.getKey().getCode(), "qiu");
+                break;
+            }
+        }
+        
+        // Si: 月令克的
+        BaziDef.FiveElement restricted = BaziDef.FIVE_ELEMENTS_RESTRICTION.get(monthElement);
+        if (restricted != null) states.put(restricted.getCode(), "si");
+        
+        return states;
     }
 
     /**
@@ -520,33 +606,175 @@ public class BaziCalculatorImpl implements BaziCalculator {
      */
     private PatternDTO calculatePattern(FourPillarsDTO fourPillars, DayMasterDTO dayMaster, 
                                         FiveElementsDTO fiveElements) {
-        String monthGan = fourPillars.getMonth().getHeavenlyStem().getChinese();
-        String monthZhi = fourPillars.getMonth().getEarthlyBranch().getChinese();
-        String dayGan = dayMaster.getGan();
+        String dayStemName = dayMaster.getGan();
+        BaziDef.StemInfo dayStemInfo = BaziDef.STEMS_INFO.get(dayStemName);
+        BaziDef.FiveElement dayElement = dayStemInfo.getElement();
         
-        // 获取月令藏干 (取本气)
-        List<HiddenStemDTO> hiddenStems = fourPillars.getMonth().getHiddenStems();
-        String monthStem = hiddenStems.isEmpty() ? null : hiddenStems.get(0).getChinese();
+        String monthBranch = fourPillars.getMonth().getEarthlyBranch().getChinese();
+        List<HiddenStemDTO> monthHiddenStems = fourPillars.getMonth().getHiddenStems();
+        List<String> tianGan = List.of(
+            fourPillars.getYear().getHeavenlyStem().getChinese(),
+            fourPillars.getMonth().getHeavenlyStem().getChinese(),
+            fourPillars.getHour().getHeavenlyStem().getChinese()
+        );
         
-        // 计算月令本气的十神
-        String monthStemTenGod = monthStem != null ? getTenGod(dayGan, monthStem) : null;
+        // Lu and Ren maps
+        Map<String, String> luMap = Map.of(
+            "甲", "寅", "乙", "卯", "丙", "巳", "丁", "午", 
+            "戊", "巳", "己", "午", "庚", "申", "辛", "酉", 
+            "壬", "亥", "癸", "子"
+        );
+        Map<String, String> renMap = Map.of(
+            "甲", "卯", "乙", "寅", "丙", "午", "丁", "巳", 
+            "戊", "午", "己", "巳", "庚", "酉", "辛", "申", 
+            "壬", "子", "癸", "亥"
+        );
         
-        // 判断是否透出
-        boolean isTransparent = monthGan.equals(monthStem);
+        // 1. 建禄格
+        if (monthBranch.equals(luMap.get(dayStemName))) {
+            return PatternDTO.builder()
+                .name("建禄格")
+                .category("normal")
+                .description("月支为日主之禄，主身旺有根，宜见财官食伤")
+                .monthStem(monthHiddenStems.isEmpty() ? null : monthHiddenStems.get(0).getChinese())
+                .isTransparent(false)
+                .build();
+        }
         
-        // 格局名称和描述
-        String name = monthStemTenGod != null ? monthStemTenGod + "格" : "未定格局";
-        String category = "normal";
-        String description = "以月令" + monthZhi + "本气" + monthStem + "(" + monthStemTenGod + ")为用";
+        // 2. 羊刃格
+        if (monthBranch.equals(renMap.get(dayStemName))) {
+            return PatternDTO.builder()
+                .name("羊刃格")
+                .category("normal")
+                .description("月支为日主之刃，主身强刚烈，宜见官杀制刃")
+                .monthStem(monthHiddenStems.isEmpty() ? null : monthHiddenStems.get(0).getChinese())
+                .isTransparent(false)
+                .build();
+        }
         
+        // 3. 特殊格局
+        double score = dayMaster.getAnalysis() != null ? dayMaster.getAnalysis().getTotalScore() : 50.0;
+        
+        // 从格 (Score < 20)
+        if (score < 20) {
+            Map<String, Double> dist = fiveElements.getDistribution();
+            // Find strongest non-day-element
+            String strongestElStr = dayElement.getCode();
+            double strongestVal = 0;
+            
+            for (BaziDef.FiveElement el : BaziDef.FiveElement.values()) {
+                if (el != dayElement && dist.getOrDefault(el.getCode(), 0.0) > strongestVal) {
+                    strongestVal = dist.get(el.getCode());
+                    strongestElStr = el.getCode();
+                }
+            }
+            
+            BaziDef.FiveElement strongestEl = BaziDef.FiveElement.fromCode(strongestElStr);
+            if (strongestEl != null) {
+                if (restrictsElement(dayElement, strongestEl)) {
+                    return PatternDTO.builder()
+                        .name("从财格")
+                        .category("special")
+                        .description("日主极弱而财星极旺，弃命从财，宜顺从财势")
+                        .build();
+                }
+                if (restrictsElement(strongestEl, dayElement)) {
+                    return PatternDTO.builder()
+                        .name("从官格")
+                        .category("special")
+                        .description("日主极弱而官杀极旺，弃命从官，宜顺从官势")
+                        .build();
+                }
+                if (generatesElement(dayElement, strongestEl)) {
+                    return PatternDTO.builder()
+                        .name("从儿格")
+                        .category("special")
+                        .description("日主极弱而食伤极旺，弃命从儿，宜顺从食伤之势")
+                        .build();
+                }
+            }
+        }
+        
+        // 专旺格 (Score > 75)
+        if (score > 75) {
+            Map<BaziDef.FiveElement, String> nameMap = Map.of(
+                BaziDef.FiveElement.WOOD, "曲直格",
+                BaziDef.FiveElement.FIRE, "炎上格",
+                BaziDef.FiveElement.EARTH, "稼穑格",
+                BaziDef.FiveElement.METAL, "从革格",
+                BaziDef.FiveElement.WATER, "润下格"
+            );
+            Map<BaziDef.FiveElement, String> descMap = Map.of(
+                BaziDef.FiveElement.WOOD, "木气专旺成局，主仁慈正直，宜水木运",
+                BaziDef.FiveElement.FIRE, "火气炎上成局，主热情礼仪，宜木火运",
+                BaziDef.FiveElement.EARTH, "土气稼穑成局，主忠厚信实，宜火土运",
+                BaziDef.FiveElement.METAL, "金气从革成局，主刚毅果决，宜土金运",
+                BaziDef.FiveElement.WATER, "水气润下成局，主聪慧灵活，宜金水运"
+            );
+            
+            return PatternDTO.builder()
+                .name(nameMap.get(dayElement))
+                .category("special")
+                .description(descMap.get(dayElement))
+                .build();
+        }
+        
+        // 4. 正格
+        if (!monthHiddenStems.isEmpty()) {
+            for (HiddenStemDTO hiddenStemDTO : monthHiddenStems) {
+                String hiddenStem = hiddenStemDTO.getChinese();
+                BaziDef.StemInfo hiddenStemInfo = BaziDef.STEMS_INFO.get(hiddenStem);
+                String tenGod = getTenGod(dayStemInfo, hiddenStemInfo);
+                
+                if ("比肩".equals(tenGod) || "劫财".equals(tenGod)) continue;
+                
+                boolean isTransparent = tianGan.contains(hiddenStem);
+                
+                Map<String, Map.Entry<String, String>> patternMap = Map.of(
+                    "正官", Map.entry("正官格", "月令透正官，主贵气端正，宜见财印相生"),
+                    "七杀", Map.entry("七杀格", "月令透七杀，主威严果决，宜见食伤制杀或印化杀"),
+                    "正财", Map.entry("正财格", "月令透正财，主务实勤俭，宜见官杀护财"),
+                    "偏财", Map.entry("偏财格", "月令透偏财，主豪爽大方，宜见官杀护财"),
+                    "正印", Map.entry("正印格", "月令透正印，主聪慧仁厚，宜见官杀生印"),
+                    "偏印", Map.entry("偏印格", "月令透偏印，主机敏多思，宜见财星制印"),
+                    "食神", Map.entry("食神格", "月令透食神，主温和福厚，宜见财星泄秀"),
+                    "伤官", Map.entry("伤官格", "月令透伤官，主聪明傲气，宜见财星或印星")
+                );
+                
+                if (tenGod != null && patternMap.containsKey(tenGod)) {
+                    Map.Entry<String, String> info = patternMap.get(tenGod);
+                    return PatternDTO.builder()
+                        .name(info.getKey())
+                        .category("normal")
+                        .description(info.getValue())
+                        .monthStem(hiddenStem)
+                        .monthStemTenGod(tenGod)
+                        .isTransparent(isTransparent)
+                        .build();
+                }
+            }
+        }
+        
+        // 5. 杂格
         return PatternDTO.builder()
-            .name(name)
-            .category(category)
-            .description(description)
-            .monthStem(monthStem)
-            .monthStemTenGod(monthStemTenGod)
-            .isTransparent(isTransparent)
+            .name("杂格")
+            .category("normal")
+            .description("月令无明显成格条件，需综合分析八字整体格局")
             .build();
+    }
+    
+    /**
+     * 判断五行相生关系
+     */
+    private boolean generatesElement(BaziDef.FiveElement from, BaziDef.FiveElement to) {
+        return BaziDef.FIVE_ELEMENTS_GENERATION.get(from) == to;
+    }
+    
+    /**
+     * 判断五行相克关系
+     */
+    private boolean restrictsElement(BaziDef.FiveElement from, BaziDef.FiveElement to) {
+        return BaziDef.FIVE_ELEMENTS_RESTRICTION.get(from) == to;
     }
 
     /**
