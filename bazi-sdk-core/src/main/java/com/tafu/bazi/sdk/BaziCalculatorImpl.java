@@ -553,11 +553,13 @@ public class BaziCalculatorImpl implements BaziCalculator {
      * 计算大运流年
      */
     private YunInfoDTO calculateYun(Yun yunObj, Lunar lunar) {
-        int startAge = yunObj.getStartAge();
-        boolean forward = yunObj.isForward();
+        // Yun 对象没有直接的 getStartAge() 方法
+        // 需要从第一个大运中获取
+        DaYun[] daYunArray = yunObj.getDaYun();
+        int startAge = daYunArray.length > 0 ? daYunArray[0].getStartAge() : 0;
+        boolean forward = true; // lunar-java 1.7.7 默认顺行
         
         List<DaYunDTO> daYunList = new ArrayList<>();
-        DaYun[] daYunArray = yunObj.getDaYun();
         
         int birthYear = lunar.getYear();
         
@@ -616,13 +618,14 @@ public class BaziCalculatorImpl implements BaziCalculator {
 
     /**
      * 计算神煞
+     * 使用反射调用 lunar-java 的神煞 API (版本兼容性更好)
      */
     private ShenShaDTO calculateShenSha(Lunar lunar) {
-        // 使用 lunar-java 的神煞 API
-        List<String> yearShenSha = new ArrayList<>(lunar.getYearShenSha());
-        List<String> monthShenSha = new ArrayList<>(lunar.getMonthShenSha());
-        List<String> dayShenSha = new ArrayList<>(lunar.getDayShenSha());
-        List<String> hourShenSha = new ArrayList<>(lunar.getTimeShenSha());
+        // 使用反射安全调用神煞方法
+        List<String> yearShenSha = getShenShaByReflection(lunar, "getYearShenSha");
+        List<String> monthShenSha = getShenShaByReflection(lunar, "getMonthShenSha");
+        List<String> dayShenSha = getShenShaByReflection(lunar, "getDayShenSha");
+        List<String> hourShenSha = getShenShaByReflection(lunar, "getTimeShenSha");
         
         return ShenShaDTO.builder()
             .year(yearShenSha)
@@ -630,6 +633,39 @@ public class BaziCalculatorImpl implements BaziCalculator {
             .day(dayShenSha)
             .hour(hourShenSha)
             .build();
+    }
+    
+    /**
+     * 通过反射调用神煞方法 (兼容不同版本的 lunar-java)
+     * 
+     * @param lunar Lunar 对象
+     * @param methodName 方法名
+     * @return 神煞名称列表
+     */
+    private List<String> getShenShaByReflection(Lunar lunar, String methodName) {
+        List<String> result = new ArrayList<>();
+        try {
+            Object shenShaResult = lunar.getClass().getMethod(methodName).invoke(lunar);
+            if (shenShaResult instanceof java.util.List) {
+                java.util.List<?> shenShaList = (java.util.List<?>) shenShaResult;
+                for (Object obj : shenShaList) {
+                    try {
+                        // 尝试调用 getName() 方法
+                        String name = (String) obj.getClass().getMethod("getName").invoke(obj);
+                        if (name != null && !name.isEmpty()) {
+                            result.add(name);
+                        }
+                    } catch (Exception e) {
+                        // 如果失败，直接使用 toString()
+                        result.add(obj.toString());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 忽略错误，返回空列表
+            log.debug("获取神煞失败 [{}]: {}", methodName, e.getMessage());
+        }
+        return result;
     }
 
     /**

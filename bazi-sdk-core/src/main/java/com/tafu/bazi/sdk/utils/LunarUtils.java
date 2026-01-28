@@ -86,10 +86,10 @@ public class LunarUtils {
      */
     public static String extractGanZhi(EightChar eightChar, String pillarType) {
         return switch (pillarType) {
-            case "year" -> eightChar.getYearGanZhi();
-            case "month" -> eightChar.getMonthGanZhi();
-            case "day" -> eightChar.getDayGanZhi();
-            case "hour" -> eightChar.getTimeGanZhi();
+            case "year" -> eightChar.getYear();
+            case "month" -> eightChar.getMonth();
+            case "day" -> eightChar.getDay();
+            case "hour" -> eightChar.getTime();
             default -> throw new IllegalArgumentException("Invalid pillar type: " + pillarType);
         };
     }
