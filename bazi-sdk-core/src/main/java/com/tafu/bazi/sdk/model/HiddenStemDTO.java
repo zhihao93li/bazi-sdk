@@ -24,4 +24,7 @@ public class HiddenStemDTO {
 
   /** 阴阳 (yang/yin) */
   private String yinYang;
+
+  /** 十神 (比肩、劫财、食神、伤官、偏财、正财、七杀、正官、偏印、正印) */
+  private String tenGod;
 }

@@ -247,6 +247,7 @@ public class BaziCalculatorImpl implements BaziCalculator {
                 .chinese(stem)
                 .element(BaziDef.TIAN_GAN_ELEMENT.get(stem))
                 .yinYang(BaziDef.TIAN_GAN_YIN_YANG.get(stem))
+                .tenGod(getTenGod(dayMasterGan, stem))
                 .build())
             .collect(Collectors.toList());
         
