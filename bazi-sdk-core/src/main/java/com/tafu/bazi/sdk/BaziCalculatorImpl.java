@@ -289,8 +289,6 @@ public class BaziCalculatorImpl implements BaziCalculator {
      * 基于五行和阴阳关系动态计算十神
      */
     private String getTenGod(BaziDef.StemInfo dayStem, BaziDef.StemInfo otherStem) {
-        if (dayStem.getChinese().equals(otherStem.getChinese())) return "比肩";
-        
         BaziDef.FiveElement dayEl = dayStem.getElement();
         BaziDef.YinYang dayYY = dayStem.getYinYang();
         BaziDef.FiveElement otherEl = otherStem.getElement();
